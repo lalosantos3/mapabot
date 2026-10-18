@@ -41,6 +41,11 @@ const commands = [
 const rest = new REST({ version: '10' }).setToken(CONFIG.TOKEN);
 
 (async () => {
-  await rest.put(Routes.applicationCommands(CONFIG.CLIENT_ID), { body: commands });
-  console.log('✅ Comandos registrados.');
+  try {
+    console.log('⏳ Registrando comandos globales para cualquier servidor...');
+    await rest.put(Routes.applicationCommands(CONFIG.CLIENT_ID), { body: commands });
+    console.log('✅ Comandos globales registrados exitosamente.');
+  } catch (error) {
+    console.error('❌ Error registrando comandos:', error);
+  }
 })();
