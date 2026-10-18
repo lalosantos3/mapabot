@@ -1,6 +1,6 @@
 import { Client, GatewayIntentBits, Partials, ActivityType } from 'discord.js';
 import { CONFIG } from './config';
-import { handleVerifyButton, handleRoleMenu } from './modules/panels';
+import { handleVerifyButton, handleRoleMenu, handleSetupSelector } from './modules/panels';
 import { showTicketModal, handleTicketModalSubmit, handleTicketButtons, handleTicketUserModal } from './modules/tickets';
 import { handleVoiceUpdate, handleVoiceControlButton, handleVoiceModals, cleanupOrphanVoiceChannels } from './modules/tempVoice';
 import { handleWelcomeAndAntiRaid, handleAutoMod, handleMessageDelete, handleMessageUpdate } from './modules/logsAndAutomod';
@@ -44,8 +44,10 @@ client.on('interactionCreate', async interaction => {
       else if (id.startsWith('vc_')) await handleVoiceControlButton(interaction);
       else if (id.startsWith('lfg_')) await handleLfgButton(interaction);
       else if (id === 'gw_enter') await handleGiveawayButton(interaction);
-    } else if (interaction.isStringSelectMenu() && interaction.customId === 'menu_autoroles') await handleRoleMenu(interaction);
-    else if (interaction.isModalSubmit()) {
+    } else if (interaction.isStringSelectMenu()) {
+      if (interaction.customId === 'menu_autoroles') await handleRoleMenu(interaction);
+      else if (interaction.customId === 'setup_selector') await handleSetupSelector(interaction);
+    } else if (interaction.isModalSubmit()) {
       if (interaction.customId === 'modal_create_ticket') await handleTicketModalSubmit(interaction);
       else if (interaction.customId === 'modal_ticket_user') await handleTicketUserModal(interaction);
       else if (interaction.customId.startsWith('modal_vc_')) await handleVoiceModals(interaction);

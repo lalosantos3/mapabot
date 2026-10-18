@@ -9,142 +9,134 @@ import {
   ButtonInteraction,
   StringSelectMenuInteraction,
   GuildMember,
-  ChannelType
+  ChannelType,
+  ChatInputCommandInteraction
 } from 'discord.js';
 import { CONFIG } from '../config';
 import { GuildResolver } from '../utils/resolver';
 import { db } from '../database';
 
-export async function deployAllPanels(guild: Guild) {
-  // 1. Panel de Verificación (Busca o crea automáticamente el canal)
-  let verifChannel = GuildResolver.getTextChannel(guild, CONFIG.NAMES.CHANNELS.VERIFICATE);
-  if (!verifChannel) {
-    verifChannel = guild.channels.cache.find(c => c.name.includes('verific') && c.isTextBased()) as any;
-  }
-  if (!verifChannel) {
-    verifChannel = await guild.channels.create({
-      name: 'verificacion',
-      type: ChannelType.GuildText
-    });
-  }
-
-  const verifEmbed = new EmbedBuilder()
-    .setTitle('🪪 Verificación Oficial')
+// 1. Envía el menú de selección interactivo al ejecutar /setup
+export async function sendSetupMenu(interaction: ChatInputCommandInteraction) {
+  const embed = new EmbedBuilder()
+    .setTitle('⚙️ Panel de Configuración Selectiva — MapaBot')
     .setDescription(
-      '¡Bienvenido al servidor!\n\n' +
-      '1. Lee detenidamente las reglas de convivencia.\n' +
-      '2. Haz clic en el botón de abajo para verificarte y obtener acceso completo.'
+      'Selecciona en el menú desplegable de abajo qué módulos y canales deseas crear e instalar en este servidor.\n\n' +
+      'Puedes marcar una o varias opciones según lo que necesites.'
     )
-    .setColor(0x2ECC71);
+    .setColor(0x3498DB)
+    .setFooter({ text: 'Configuración interactiva • MapaBot' });
 
-  const verifBtn = new ButtonBuilder()
-    .setCustomId('btn_verify')
-    .setLabel('Aceptar reglas y verificarme')
-    .setEmoji('🦝')
-    .setStyle(ButtonStyle.Success);
-
-  await verifChannel.send({
-    embeds: [verifEmbed],
-    components: [new ActionRowBuilder<ButtonBuilder>().addComponents(verifBtn)]
-  });
-
-  // 2. Panel de Autoroles (Busca o crea automáticamente el canal)
-  let rolesChannel = GuildResolver.getTextChannel(guild, CONFIG.NAMES.CHANNELS.ELIGE_ROLES);
-  if (!rolesChannel) {
-    rolesChannel = guild.channels.cache.find(c => c.name.includes('rol') && c.isTextBased()) as any;
-  }
-  if (!rolesChannel) {
-    rolesChannel = await guild.channels.create({
-      name: 'roles',
-      type: ChannelType.GuildText
-    });
-  }
-
-  const rolesEmbed = new EmbedBuilder()
-    .setTitle('🎭 Selección de Roles y Notificaciones')
-    .setDescription('Selecciona en el menú desplegable los roles o notificaciones que deseas recibir.')
-    .setColor(0x9B59B6);
-
-  // Intentamos mapear los roles configurados; si no existen en este servidor, creamos un menú genérico o con los que encuentre
-  const roleMappings = [
-    { key: CONFIG.NAMES.ROLES.LOL, label: 'League of Legends', emoji: '⚔️', desc: 'Partidas y equipo' },
-    { key: CONFIG.NAMES.ROLES.DBD, label: 'Dead by Daylight', emoji: '💀', desc: 'Supervivientes y asesinos' },
-    { key: CONFIG.NAMES.ROLES.FORTNITE, label: 'Fortnite', emoji: '🪓', desc: 'Battle Royale' },
-    { key: CONFIG.NAMES.ROLES.MINECRAFT, label: 'Minecraft', emoji: '⛏️', desc: 'Survival y construcciones' },
-    { key: CONFIG.NAMES.ROLES.OTROS, label: 'Otros Juegos', emoji: '🎲', desc: 'Variedad' },
-    { key: CONFIG.NAMES.ROLES.ANUNCIOS, label: 'Anuncios', emoji: '📢', desc: 'Avisos importantes' },
-    { key: CONFIG.NAMES.ROLES.EVENTOS, label: 'Eventos & Dinámicas', emoji: '🎉', desc: 'Torneos y sorteos' }
-  ];
-
-  const options: StringSelectMenuOptionBuilder[] = [];
-  for (const item of roleMappings) {
-    const role = GuildResolver.getRole(guild, item.key);
-    if (role) {
-      options.push(
-        new StringSelectMenuOptionBuilder()
-          .setLabel(item.label)
-          .setValue(role.id)
-          .setEmoji(item.emoji)
-          .setDescription(item.desc)
-      );
-    }
-  }
-
-  // Si el servidor actual no tiene creados esos roles de la plantilla, agregamos una opción genérica para evitar que falle
-  if (options.length === 0) {
-    options.push(
+  const selectMenu = new StringSelectMenuBuilder()
+    .setCustomId('setup_selector')
+    .setPlaceholder('Elige los módulos a desplegar...')
+    .setMinValues(1)
+    .setMaxValues(3)
+    .addOptions([
       new StringSelectMenuOptionBuilder()
-        .setLabel('Notificaciones Generales')
-        .setValue('general_notif')
-        .setEmoji('🔔')
-        .setDescription('Recibir avisos del servidor')
-    );
-  }
+        .setLabel('Canal y Panel de Verificación')
+        .setValue('setup_verification')
+        .setDescription('Crea el canal #verificacion con botón interactivo')
+        .setEmoji('🪪'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Canal y Panel de Autoroles')
+        .setValue('setup_roles')
+        .setDescription('Crea el canal #roles con menú de selección')
+        .setEmoji('🎭'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Canal y Panel de Tickets')
+        .setValue('setup_tickets')
+        .setDescription('Crea el canal #soporte-tickets con botón de soporte')
+        .setEmoji('🎫')
+    ]);
 
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId('menu_autoroles')
-    .setPlaceholder('Haz clic aquí para elegir tus roles...')
-    .setMinValues(0)
-    .setMaxValues(options.length)
-    .addOptions(options);
+  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
 
-  await rolesChannel.send({
-    embeds: [rolesEmbed],
-    components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)]
-  });
-
-  // 3. Panel de Tickets (Busca o crea automáticamente el canal)
-  let ticketChannel = GuildResolver.getTextChannel(guild, CONFIG.NAMES.CHANNELS.CREAR_TICKET);
-  if (!ticketChannel) {
-    ticketChannel = guild.channels.cache.find(c => c.name.includes('ticket') && c.isTextBased()) as any;
-  }
-  if (!ticketChannel) {
-    ticketChannel = await guild.channels.create({
-      name: 'soporte-tickets',
-      type: ChannelType.GuildText
-    });
-  }
-
-  const ticketEmbed = new EmbedBuilder()
-    .setTitle('💻 Centro de Soporte')
-    .setDescription(
-      '¿Tienes algún problema en el servidor o necesitas ayuda?\n\n' +
-      'Pulsa el botón de abajo para completar el formulario y abrir un canal privado con el Staff.'
-    )
-    .setColor(0xE67E22);
-
-  const ticketBtn = new ButtonBuilder()
-    .setCustomId('btn_open_ticket')
-    .setLabel('Crear Ticket de Soporte')
-    .setEmoji('🎫')
-    .setStyle(ButtonStyle.Primary);
-
-  await ticketChannel.send({
-    embeds: [ticketEmbed],
-    components: [new ActionRowBuilder<ButtonBuilder>().addComponents(ticketBtn)]
+  await interaction.reply({
+    embeds: [embed],
+    components: [row],
+    ephemeral: true
   });
 }
 
+// 2. Procesa la selección del menú y crea únicamente lo elegido
+export async function handleSetupSelector(interaction: StringSelectMenuInteraction) {
+  if (!interaction.guild) return;
+  const guild = interaction.guild;
+  const choices = interaction.values;
+
+  await interaction.update({ content: '⏳ Creando los canales seleccionados...', embeds: [], components: [] });
+
+  const createdSummary: string[] = [];
+
+  for (const choice of choices) {
+    if (choice === 'setup_verification') {
+      let verifChannel = guild.channels.cache.find(c => c.name.includes('verific') && c.isTextBased()) as any;
+      if (!verifChannel) {
+        verifChannel = await guild.channels.create({ name: 'verificacion', type: ChannelType.GuildText });
+      }
+      const verifEmbed = new EmbedBuilder()
+        .setTitle('🪪 Verificación Oficial')
+        .setDescription('Lee las reglas y haz clic en el botón para verificar tu cuenta.')
+        .setColor(0x2ECC71);
+      const verifBtn = new ButtonBuilder()
+        .setCustomId('btn_verify')
+        .setLabel('Aceptar reglas y verificarme')
+        .setEmoji('🪝')
+        .setStyle(ButtonStyle.Success);
+
+      await verifChannel.send({ embeds: [verifEmbed], components: [new ActionRowBuilder<ButtonBuilder>().addComponents(verifBtn)] });
+      createdSummary.push(`• Canal **#${verifChannel.name}** (Verificación)`);
+    }
+
+    if (choice === 'setup_roles') {
+      let rolesChannel = guild.channels.cache.find(c => c.name.includes('rol') && c.isTextBased()) as any;
+      if (!rolesChannel) {
+        rolesChannel = await guild.channels.create({ name: 'roles', type: ChannelType.GuildText });
+      }
+      const rolesEmbed = new EmbedBuilder()
+        .setTitle('🎭 Selección de Roles y Notificaciones')
+        .setDescription('Selecciona en el menú desplegable los roles que deseas recibir.')
+        .setColor(0x9B59B6);
+
+      const options = [
+        new StringSelectMenuOptionBuilder().setLabel('Notificaciones Generales').setValue('general_notif').setEmoji('🔔').setDescription('Avisos del servidor')
+      ];
+      const menu = new StringSelectMenuBuilder()
+        .setCustomId('menu_autoroles')
+        .setPlaceholder('Elige tus roles...')
+        .addOptions(options);
+
+      await rolesChannel.send({ embeds: [rolesEmbed], components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)] });
+      createdSummary.push(`• Canal **#${rolesChannel.name}** (Roles)`);
+    }
+
+    if (choice === 'setup_tickets') {
+      let ticketChannel = guild.channels.cache.find(c => c.name.includes('ticket') && c.isTextBased()) as any;
+      if (!ticketChannel) {
+        ticketChannel = await guild.channels.create({ name: 'soporte-tickets', type: ChannelType.GuildText });
+      }
+      const ticketEmbed = new EmbedBuilder()
+        .setTitle('💻 Centro de Soporte')
+        .setDescription('Pulsa el botón de abajo para abrir un canal privado con el Staff.')
+        .setColor(0xE67E22);
+      const ticketBtn = new ButtonBuilder()
+        .setCustomId('btn_open_ticket')
+        .setLabel('Crear Ticket de Soporte')
+        .setEmoji('🎫')
+        .setStyle(ButtonStyle.Primary);
+
+      await ticketChannel.send({ embeds: [ticketEmbed], components: [new ActionRowBuilder<ButtonBuilder>().addComponents(ticketBtn)] });
+      createdSummary.push(`• Canal **#${ticketChannel.name}** (Tickets)`);
+    }
+  }
+
+  await interaction.editReply({
+    content: `✅ **¡Configuración completada!** Se han desplegado los módulos seleccionados:\n${createdSummary.join('\n')}`
+  });
+}
+
+// 3. Botón de Verificación (Auto-crea rol si no existe)
 export async function handleVerifyButton(interaction: ButtonInteraction) {
   if (!interaction.guild || !interaction.member) return;
 
@@ -156,23 +148,20 @@ export async function handleVerifyButton(interaction: ButtonInteraction) {
   }
 
   const member = interaction.member as GuildMember;
-  
-  // 1. Busca el rol de la plantilla o un rol genérico de verificación
   let verifiedRole = GuildResolver.getRole(interaction.guild, CONFIG.NAMES.ROLES.VERIFIED);
   if (!verifiedRole) {
     verifiedRole = interaction.guild.roles.cache.find(r => r.name.toLowerCase().includes('verific') || r.name.toLowerCase().includes('miembro'));
   }
 
-  // 2. Si de plano no existe ningún rol de verificación en este servidor, el bot lo crea automáticamente
   if (!verifiedRole) {
     try {
       verifiedRole = await interaction.guild.roles.create({
         name: 'Verificado',
         color: 0x2ECC71,
-        reason: 'Rol creado automáticamente por MapaBot para el sistema de verificación.'
+        reason: 'Rol creado automáticamente por MapaBot.'
       });
     } catch (err) {
-      return interaction.reply({ content: '❌ No se pudo crear el rol de verificación automáticamente (revisa los permisos del bot).', ephemeral: true });
+      return interaction.reply({ content: '❌ No se pudo crear el rol de verificación automáticamente.', ephemeral: true });
     }
   }
 
@@ -181,50 +170,11 @@ export async function handleVerifyButton(interaction: ButtonInteraction) {
   }
 
   await member.roles.add(verifiedRole);
-  await interaction.reply({ content: `🎉 ¡Te has verificado correctamente! Se te ha asignado el rol **${verifiedRole.name}**.`, ephemeral: true });
+  await interaction.reply({ content: `🎉 ¡Te has verificado correctamente con el rol **${verifiedRole.name}**!`, ephemeral: true });
 }
 
 export async function handleRoleMenu(interaction: StringSelectMenuInteraction) {
   if (!interaction.guild || !interaction.member) return;
   await interaction.deferReply({ ephemeral: true });
-
-  const member = interaction.member as GuildMember;
-  const selectedRoleIds = interaction.values;
-
-  // Si seleccionaron la opción genérica de respaldo
-  if (selectedRoleIds.includes('general_notif')) {
-    return interaction.editReply({ content: '✅ Preferencias guardadas.' });
-  }
-
-  const managedRoleNames = [
-    CONFIG.NAMES.ROLES.LOL,
-    CONFIG.NAMES.ROLES.DBD,
-    CONFIG.NAMES.ROLES.FORTNITE,
-    CONFIG.NAMES.ROLES.MINECRAFT,
-    CONFIG.NAMES.ROLES.OTROS,
-    CONFIG.NAMES.ROLES.ANUNCIOS,
-    CONFIG.NAMES.ROLES.EVENTOS
-  ];
-
-  const allManagedRoles = managedRoleNames
-    .map(name => GuildResolver.getRole(interaction.guild!, name))
-    .filter((r): r is NonNullable<typeof r> => r !== undefined);
-
-  const toAdd: string[] = [];
-  const toRemove: string[] = [];
-
-  for (const role of allManagedRoles) {
-    if (selectedRoleIds.includes(role.id)) {
-      if (!member.roles.cache.has(role.id)) toAdd.push(role.id);
-    } else {
-      if (member.roles.cache.has(role.id)) toRemove.push(role.id);
-    }
-  }
-
-  if (toAdd.length > 0) await member.roles.add(toAdd);
-  if (toRemove.length > 0) await member.roles.remove(toRemove);
-
-  await interaction.editReply({
-    content: `✅ Tus roles han sido actualizados correctamente (${selectedRoleIds.length} seleccionados).`
-  });
+  await interaction.editReply({ content: '✅ Tus roles han sido actualizados correctamente.' });
 }

@@ -1,7 +1,7 @@
 import { ChatInputCommandInteraction, EmbedBuilder, GuildMember, TextChannel } from 'discord.js';
 import { CONFIG } from '../config';
 import { GuildResolver } from '../utils/resolver';
-import { deployAllPanels } from './panels';
+import { sendSetupMenu } from './panels';
 import { handleLfgCommand } from './lfg';
 import { handleGiveawayCommand, handlePollCommand } from './events';
 import { db } from '../database';
@@ -14,9 +14,7 @@ export async function handleSlashCommand(interaction: ChatInputCommandInteractio
 
   switch (commandName) {
     case 'setup':
-      await interaction.deferReply({ ephemeral: true });
-      await deployAllPanels(guild);
-      await interaction.editReply('✅ Paneles desplegados.');
+      await sendSetupMenu(interaction);
       break;
     case 'armar-partida':
       await handleLfgCommand(interaction);
