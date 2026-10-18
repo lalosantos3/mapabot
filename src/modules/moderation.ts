@@ -2,7 +2,7 @@ import { ChatInputCommandInteraction, EmbedBuilder, GuildMember, TextChannel } f
 import { CONFIG } from '../config';
 import { GuildResolver } from '../utils/resolver';
 import { sendSetupMenu } from './panels';
-import { handleLfgCommand } from './lfg';
+import { showLfgModal } from './lfg';
 import { handleGiveawayCommand, handlePollCommand } from './events';
 import { db } from '../database';
 
@@ -17,7 +17,7 @@ export async function handleSlashCommand(interaction: ChatInputCommandInteractio
       await sendSetupMenu(interaction);
       break;
     case 'armar-partida':
-      await handleLfgCommand(interaction);
+      await showLfgModal(interaction);
       break;
     case 'sorteo':
       await handleGiveawayCommand(interaction);

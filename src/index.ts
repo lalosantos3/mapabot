@@ -5,7 +5,7 @@ import { showTicketModal, handleTicketModalSubmit, handleTicketButtons, handleTi
 import { handleVoiceUpdate, handleVoiceControlButton, handleVoiceModals, cleanupOrphanVoiceChannels } from './modules/tempVoice';
 import { handleWelcomeAndAntiRaid, handleAutoMod, handleMessageDelete, handleMessageUpdate } from './modules/logsAndAutomod';
 import { handleSlashCommand } from './modules/moderation';
-import { handleLfgButton } from './modules/lfg';
+import { handleLfgButton, handleLfgModalSubmit } from './modules/lfg';
 import { handleGiveawayButton, startGiveawayTicker } from './modules/events';
 
 const client = new Client({
@@ -51,6 +51,7 @@ client.on('interactionCreate', async interaction => {
       if (interaction.customId === 'modal_create_ticket') await handleTicketModalSubmit(interaction);
       else if (interaction.customId === 'modal_ticket_user') await handleTicketUserModal(interaction);
       else if (interaction.customId.startsWith('modal_vc_')) await handleVoiceModals(interaction);
+      else if (interaction.customId === 'modal_armar_partida') await handleLfgModalSubmit(interaction);
     }
   } catch (err) {
     console.error('Error:', err);

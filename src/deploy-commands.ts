@@ -5,16 +5,7 @@ const commands = [
   new SlashCommandBuilder().setName('setup').setDescription('Despliega paneles').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder()
     .setName('armar-partida')
-    .setDescription('Crea lobby LFG')
-    .addStringOption(opt => opt.setName('juego').setDescription('Juego').setRequired(true).addChoices(
-      { name: 'LoL', value: 'League of Legends' },
-      { name: 'DbD', value: 'Dead by Daylight' },
-      { name: 'Fortnite', value: 'Fortnite' },
-      { name: 'Minecraft', value: 'Minecraft' },
-      { name: 'Otros', value: 'Otros Juegos' }
-    ))
-    .addStringOption(opt => opt.setName('modo').setDescription('Modo').setRequired(true))
-    .addIntegerOption(opt => opt.setName('faltan').setDescription('Faltan').setRequired(true)),
+    .setDescription('Abre el formulario para armar un escuadrón de juego'),
   new SlashCommandBuilder().setName('sorteo').setDescription('Crea sorteo').setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addStringOption(opt => opt.setName('premio').setDescription('Premio').setRequired(true))
     .addIntegerOption(opt => opt.setName('minutos').setDescription('Minutos').setRequired(true))

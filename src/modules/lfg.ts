@@ -6,19 +6,53 @@ import {
   ButtonStyle,
   ButtonInteraction,
   GuildMember,
-  Role,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ModalSubmitInteraction,
   TextChannel
 } from 'discord.js';
 import { CONFIG } from '../config';
 import { GuildResolver } from '../utils/resolver';
 
-const GAME_ROLE_MAP: Record<string, string> = {
-  'League of Legends': CONFIG.NAMES.ROLES.LOL,
-  'Dead by Daylight': CONFIG.NAMES.ROLES.DBD,
-  'Fortnite': CONFIG.NAMES.ROLES.FORTNITE,
-  'Minecraft': CONFIG.NAMES.ROLES.MINECRAFT,
-  'Otros Juegos': CONFIG.NAMES.ROLES.OTROS
-};
+// 1. Muestra la ventana emergente (Modal) al usar /armar-partida
+export async function showLfgModal(interaction: ChatInputCommandInteraction) {
+  const modal = new ModalBuilder()
+    .setCustomId('modal_armar_partida')
+    .setTitle('🎮 Armar Partida / LFG');
+
+  const gameInput = new TextInputBuilder()
+    .setCustomId('lfg_game')
+    .setLabel('¿Qué juego jugarán?')
+    .setPlaceholder('Ej: League of Legends, Fortnite, Valorant...')
+    .setStyle(TextInputStyle.Short)
+    .setMaxLength(50)
+    .setRequired(true);
+
+  const modeInput = new TextInputBuilder()
+    .setCustomId('lfg_mode')
+    .setLabel('Modo de juego o descripción')
+    .setPlaceholder('Ej: Flex, Duos, Normales, Rango...')
+    .setStyle(TextInputStyle.Short)
+    .setMaxLength(50)
+    .setRequired(true);
+
+  const slotsInput = new TextInputBuilder()
+    .setCustomId('lfg_slots')
+    .setLabel('¿Cuántos jugadores faltan? (Número)')
+    .setPlaceholder('Ej: 2')
+    .setStyle(TextInputStyle.Short)
+    .setMaxLength(2)
+    .setRequired(true);
+
+  modal.addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(gameInput),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(modeInput),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(slotsInput)
+  );
+
+  await interaction.showModal(modal);
+}
 
 function buildLfgEmbed(
   game: string,
@@ -44,23 +78,30 @@ function buildLfgEmbed(
     .setTimestamp();
 }
 
-export async function handleLfgCommand(interaction: ChatInputCommandInteraction) {
+// 2. Procesa los datos enviados desde el Modal
+export async function handleLfgModalSubmit(interaction: ModalSubmitInteraction) {
   const guild = interaction.guild;
   const member = interaction.member as GuildMember;
   if (!guild || !member) return;
 
-  const game = interaction.options.getString('juego', true);
-  const mode = interaction.options.getString('modo', true);
-  const missingSlots = interaction.options.getInteger('faltan', true);
-  const maxSlots = missingSlots + 1;
+  await interaction.deferReply({ ephemeral: true });
+
+  const game = interaction.fields.getTextInputValue('lfg_game');
+  const mode = interaction.fields.getTextInputValue('lfg_mode');
+  const rawSlots = parseInt(interaction.fields.getTextInputValue('lfg_slots'), 10);
+
+  if (isNaN(rawSlots) || rawSlots < 1 || rawSlots > 9) {
+    return interaction.editReply({ content: '❌ Por favor ingresa un número válido de espacios (entre 1 y 9).' });
+  }
+
+  const maxSlots = rawSlots + 1;
 
   const lfgChannel = (GuildResolver.getTextChannel(guild, CONFIG.NAMES.CHANNELS.ARMAR_PARTIDA) || interaction.channel) as TextChannel;
-  if (!lfgChannel || !lfgChannel.isTextBased()) return;
+  if (!lfgChannel || !lfgChannel.isTextBased()) {
+    return interaction.editReply({ content: '❌ No se encontró un canal de texto válido para publicar la lobby.' });
+  }
 
-  const roleName = GAME_ROLE_MAP[game];
-  const gameRole: Role | undefined = roleName ? GuildResolver.getRole(guild, roleName) : undefined;
   const voiceChannelId = member.voice.channelId;
-
   const players = [interaction.user.id];
   const embed = buildLfgEmbed(game, mode, interaction.user.id, players, maxSlots, voiceChannelId);
 
@@ -70,10 +111,8 @@ export async function handleLfgCommand(interaction: ChatInputCommandInteraction)
     new ButtonBuilder().setCustomId('lfg_cancel').setLabel('Cerrar').setStyle(ButtonStyle.Danger)
   );
 
-  const mentionContent = gameRole ? `<@&${gameRole.id}> ¡<@${interaction.user.id}> está armando partida!` : `¡<@${interaction.user.id}> está armando partida!`;
-
   const msg = await lfgChannel.send({
-    content: mentionContent,
+    content: `¡<@${interaction.user.id}> está armando partida!`,
     embeds: [embed],
     components: [row]
   });
@@ -82,15 +121,16 @@ export async function handleLfgCommand(interaction: ChatInputCommandInteraction)
   allSessions[msg.id] = { channelId: lfgChannel.id, hostId: interaction.user.id, game, mode, maxSlots, players, voiceChannelId };
   (global as any).lfgSessions = allSessions;
 
-  await interaction.reply({ content: `✅ Lobby publicada en <#${lfgChannel.id}>.`, ephemeral: true });
+  await interaction.editReply({ content: `✅ ¡Tu lobby fue publicada exitosamente en <#${lfgChannel.id}>!` });
 }
 
+// 3. Maneja los botones de unirse / salir / cerrar de la tarjeta publicada
 export async function handleLfgButton(interaction: ButtonInteraction) {
   const allSessions = (global as any).lfgSessions || {};
   const session = allSessions[interaction.message.id];
 
   if (!session) {
-    return interaction.reply({ content: '❌ Esta lobby ya expiró.', ephemeral: true });
+    return interaction.reply({ content: '❌ Esta lobby ya expiró o no está activa.', ephemeral: true });
   }
 
   let players: string[] = session.players;
