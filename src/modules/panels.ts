@@ -156,14 +156,24 @@ export async function handleVerifyButton(interaction: ButtonInteraction) {
   }
 
   const member = interaction.member as GuildMember;
+  
+  // 1. Busca el rol de la plantilla o un rol genérico de verificación
   let verifiedRole = GuildResolver.getRole(interaction.guild, CONFIG.NAMES.ROLES.VERIFIED);
   if (!verifiedRole) {
-    // Si no encuentra el rol exacto de la plantilla, busca uno genérico llamado "Miembro" o "Verificado"
     verifiedRole = interaction.guild.roles.cache.find(r => r.name.toLowerCase().includes('verific') || r.name.toLowerCase().includes('miembro'));
   }
 
+  // 2. Si de plano no existe ningún rol de verificación en este servidor, el bot lo crea automáticamente
   if (!verifiedRole) {
-    return interaction.reply({ content: '❌ No se encontró un rol de verificación en este servidor.', ephemeral: true });
+    try {
+      verifiedRole = await interaction.guild.roles.create({
+        name: 'Verificado',
+        color: 0x2ECC71,
+        reason: 'Rol creado automáticamente por MapaBot para el sistema de verificación.'
+      });
+    } catch (err) {
+      return interaction.reply({ content: '❌ No se pudo crear el rol de verificación automáticamente (revisa los permisos del bot).', ephemeral: true });
+    }
   }
 
   if (member.roles.cache.has(verifiedRole.id)) {
@@ -171,7 +181,7 @@ export async function handleVerifyButton(interaction: ButtonInteraction) {
   }
 
   await member.roles.add(verifiedRole);
-  await interaction.reply({ content: '🎉 ¡Te has verificado correctamente!', ephemeral: true });
+  await interaction.reply({ content: `🎉 ¡Te has verificado correctamente! Se te ha asignado el rol **${verifiedRole.name}**.`, ephemeral: true });
 }
 
 export async function handleRoleMenu(interaction: StringSelectMenuInteraction) {
